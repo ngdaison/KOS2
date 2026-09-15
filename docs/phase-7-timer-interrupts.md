@@ -107,9 +107,9 @@ sends EOI to slave first, then master.
 
 Build and run:
 
-```powershell
-.\scripts\build.ps1
-.\scripts\run-qemu.ps1
+```text
+python tools/kos.py build
+python tools/kos.py run
 ```
 
 Observed QEMU serial output includes:

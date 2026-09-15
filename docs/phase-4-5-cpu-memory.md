@@ -21,8 +21,8 @@ CPU exception
           -> cli; hlt loop
 ```
 
-The normal kernel build does not intentionally fault. `scripts/build.ps1
--PanicTest` enables the deliberate divide-by-zero validation build.
+The normal kernel build does not intentionally fault. `python tools/kos.py build
+--panic-test` enables the deliberate divide-by-zero validation build.
 
 The normal build uses `-O2` while retaining debug symbols. The artificial
 divide instruction is specifically marked non-inline/non-optimised so the panic
@@ -102,7 +102,7 @@ meminfo
   Allocated frames: 0
 ```
 
-The deliberate `scripts/build.ps1 -PanicTest` build produced a visible and
+The deliberate `python tools/kos.py build --panic-test` build produced a visible and
 serialised `Divide-by-zero (#DE)` panic with the vector, error code, RIP, and
 RFLAGS, then halted as designed. The normal non-panic build was restored after
 the test.

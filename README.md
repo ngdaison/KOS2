@@ -46,43 +46,44 @@ kernel/       Kernel entry and high-level coordination
 lib/          Freestanding utility routines
 mm/           Physical memory, virtual memory, and heap
 docs/         Design decisions and project documentation
-scripts/      Environment validation and project setup helpers
+tools/        Python environment, build, staging, and QEMU launcher
 third_party/  Downloaded dependencies; not committed
 ```
 
 ## Build and run
 
-Run the environment check in PowerShell:
+Run the environment check from any terminal with Python 3:
 
-```powershell
-.\\scripts\\check-environment.ps1
+```text
+python tools/kos.py check
 ```
 
 See [docs/environment.md](docs/environment.md) for setup choices. Once the host
 tools are ready, obtain Limine and its protocol/header dependency with:
 
-```powershell
-.\\scripts\\bootstrap-limine.ps1
+```text
+python tools/kos.py bootstrap-limine
+python tools/kos.py bootstrap-assets
 ```
 
-Build the Phase 2 kernel ELF and prepare a UEFI ESP directory with:
+Build the KOS kernel ELF and prepare a UEFI ESP directory with:
 
-```powershell
-.\\scripts\\build.ps1
+```text
+python tools/kos.py build
 ```
 
 Run it in QEMU with:
 
-```powershell
-.\\scripts\\run-qemu.ps1
+```text
+python tools/kos.py run
 ```
 
 The expected serial log begins with `KOS: kernel started` and ends at the
 interactive `KOS> ` prompt. To also open QEMU's framebuffer window and inspect
 the text console, use:
 
-```powershell
-.\scripts\run-qemu.ps1 -Display
+```text
+python tools/kos.py run --display
 ```
 
 ## Documentation

@@ -18,7 +18,7 @@ Limine accepted the base revision, print useful completion logs, and halt
 cleanly. Do not add framebuffer, keyboard, timer, heap, filesystem, processes,
 user mode, or GUI code.
 
-Provide reproducible PowerShell build/run scripts. The build must target
+Provide reproducible build/run tooling. The build must target
 `x86_64-unknown-none-elf`, use no host C runtime or libc, assemble with NASM,
 link with LLD and a custom linker script, and stage a UEFI FAT ESP directory
 containing Limine `BOOTX64.EFI`, `limine.conf`, and `boot/kos.elf`. The run

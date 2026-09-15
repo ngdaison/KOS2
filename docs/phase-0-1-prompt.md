@@ -34,7 +34,7 @@ Write concise English documentation that includes:
    and xorriso.
 6. Coding conventions appropriate for freestanding kernel C.
 
-Also create PowerShell scripts that:
+Also create build tooling that:
 - Check tool availability without modifying the system.
 - Clone Limine from its official repository into third_party/limine only when
   explicitly run, and refuse to overwrite an existing non-empty destination.

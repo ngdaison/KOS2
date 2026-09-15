@@ -1,6 +1,8 @@
 # Build output
 build/
 dist/
+__pycache__/
+*.pyc
 
 # Downloaded third-party sources and release assets
 third_party/limine/

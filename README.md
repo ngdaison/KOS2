@@ -46,36 +46,37 @@ kernel/       Kernel entry and high-level coordination
 lib/          Freestanding utility routines
 mm/           Physical memory, virtual memory, and heap
 docs/         Design decisions and project documentation
-tools/        Python environment, build, staging, and QEMU launcher
+tools/        C environment, build, staging, and QEMU launcher
 third_party/  Downloaded dependencies; not committed
 ```
 
 ## Build and run
 
-Run the environment check from any terminal with Python 3:
+Compile the C development tool once from the repository root:
 
 ```text
-python tools/kos.py check
+clang -std=c17 -O2 -Wall -Wextra -Werror tools/kos.c -o tools/kos-tool.exe
+tools\kos-tool.exe check
 ```
 
 See [docs/environment.md](docs/environment.md) for setup choices. Once the host
 tools are ready, obtain Limine and its protocol/header dependency with:
 
 ```text
-python tools/kos.py bootstrap-limine
-python tools/kos.py bootstrap-assets
+tools\kos-tool.exe bootstrap-limine
+tools\kos-tool.exe bootstrap-assets
 ```
 
 Build the KOS kernel ELF and prepare a UEFI ESP directory with:
 
 ```text
-python tools/kos.py build
+tools\kos-tool.exe build
 ```
 
 Run it in QEMU with:
 
 ```text
-python tools/kos.py run
+tools\kos-tool.exe run
 ```
 
 The expected serial log begins with `KOS: kernel started` and ends at the
@@ -83,7 +84,7 @@ interactive `KOS> ` prompt. To also open QEMU's framebuffer window and inspect
 the text console, use:
 
 ```text
-python tools/kos.py run --display
+tools\kos-tool.exe run --display
 ```
 
 ## Documentation

@@ -120,9 +120,9 @@ guest's execution state.
 
 ## Verification sequence
 
-1. Build with `python tools/kos.py build`; warnings are errors and the ELF layout is
+1. Build with `tools\kos-tool.exe build`; warnings are errors and the ELF layout is
    rechecked by the build script.
-2. Run QEMU with `python tools/kos.py run --display`.
+2. Run QEMU with `tools\kos-tool.exe run --display`.
 3. Confirm boot reaches `KOS> ` without a panic and that `uptime` increases.
 4. Type `help`, `uptime`, `echo hello`, and `meminfo`; confirm each returns a
    new prompt.

@@ -13,7 +13,7 @@ boot protocol or requiring later subsystems.
   executable and one writable segment, before staging the UEFI ESP.
 - Build output reports only the useful verification result instead of the full
   symbol table.
-- `python tools/kos.py run --display` opens the framebuffer window. The default continues
+- `tools\kos-tool.exe run --display` opens the framebuffer window. The default continues
   to use serial-only mode, which is better for repeatable debugging.
 
 ## Phase 2: controlled early output

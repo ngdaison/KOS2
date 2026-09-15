@@ -7,7 +7,7 @@ real, working base but deliberately does not claim its later product features.
 | Phase | Optimized responsibility | Status | Acceptance check |
 | --- | --- | --- | --- |
 | 0 | Scope, x86_64/UEFI/QEMU boundary, no GUI or compatibility claims | Implemented | Scope is explicit and testable. |
-| 1 | Reproducible cross-build, source layout, QEMU tooling | Implemented | `python tools/kos.py build` stages a bootable ESP. |
+| 1 | Reproducible cross-build, source layout, QEMU tooling | Implemented | `tools\kos-tool.exe build` stages a bootable ESP. |
 | 2 | Limine entry, owned bootstrap stack, serial-first diagnostics | Implemented | `KOS: kernel started`. |
 | 3 | Framebuffer text console and shared log output | Implemented | Text is visible in QEMU and serial. |
 | 4 | GDT, IDT, exception report, safe halt | Implemented | Deliberate divide-by-zero prints a panic. |

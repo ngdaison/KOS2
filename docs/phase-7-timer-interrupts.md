@@ -108,8 +108,8 @@ sends EOI to slave first, then master.
 Build and run:
 
 ```text
-python tools/kos.py build
-python tools/kos.py run
+tools\kos-tool.exe build
+tools\kos-tool.exe run
 ```
 
 Observed QEMU serial output includes:

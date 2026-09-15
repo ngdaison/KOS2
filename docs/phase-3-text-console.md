@@ -46,5 +46,5 @@ keyboard input system, window manager, font rasterizer, or user-space shell.
 - The QEMU display shows the same messages with a visible cursor.
 - The framebuffer is validated before any memory writes.
 - Scrolling moves pixels only within the reported framebuffer geometry.
-- Run `python tools/kos.py run --display` to inspect the framebuffer window; the
+- Run `tools\kos-tool.exe run --display` to inspect the framebuffer window; the
   default run remains serial-only for automated debugging.

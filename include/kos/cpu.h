@@ -1,0 +1,26 @@
+#ifndef KOS_CPU_H
+#define KOS_CPU_H
+
+#include <stdint.h>
+
+#include <kos/compiler.h>
+
+enum {
+    KOS_KERNEL_CODE_SELECTOR = 0x08,
+    KOS_KERNEL_DATA_SELECTOR = 0x10,
+    KOS_KERNEL_TSS_SELECTOR = 0x18,
+};
+
+void gdt_initialize(void);
+void idt_initialize(void);
+KOS_NORETURN void cpu_halt(void);
+KOS_NORETURN void cpu_idle(void);
+KOS_NORETURN void cpu_reboot(void);
+void cpu_enable_interrupts(void);
+void cpu_wait_for_interrupt(void);
+uint64_t cpu_read_cr2(void);
+uint64_t cpu_read_cr3(void);
+void cpu_invalidate_page(uint64_t virtual_address);
+void cpu_trigger_divide_by_zero(void);
+
+#endif

@@ -1,0 +1,17 @@
+# Build output
+build/
+dist/
+
+# Downloaded third-party sources and release assets
+third_party/limine/
+third_party/limine-protocol/
+third_party/limine-binary/
+third_party/tools/
+third_party/font8x8/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini

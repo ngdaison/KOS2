@@ -3,6 +3,7 @@
 
 #include <kos/memory.h>
 #include <kos/pmm.h>
+#include <kos/sync.h>
 
 enum {
     FRAME_SIZE = KOS_PAGE_SIZE,
@@ -27,6 +28,7 @@ struct physical_memory_manager {
 };
 
 static struct physical_memory_manager pmm;
+static struct kos_spinlock pmm_lock = KOS_SPINLOCK_INITIALIZER;
 
 static uint64_t saturating_add(uint64_t left, uint64_t right) {
     if (UINT64_MAX - left < right) {
@@ -155,6 +157,8 @@ bool pmm_initialize(const struct limine_memmap_response *memory_map) {
         return false;
     }
 
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+
     zero_bitmap(pmm.usable_bitmap);
     zero_bitmap(pmm.free_bitmap);
     pmm.total_memory_bytes = 0;
@@ -171,6 +175,7 @@ bool pmm_initialize(const struct limine_memmap_response *memory_map) {
     for (uint64_t index = 0; index < memory_map->entry_count; ++index) {
         const struct limine_memmap_entry *entry = memory_map->entries[index];
         if (entry == 0) {
+            spinlock_unlock_irqrestore(&pmm_lock, flags);
             return false;
         }
         if (memory_type_is_physical_ram(entry->type)) {
@@ -187,7 +192,9 @@ bool pmm_initialize(const struct limine_memmap_response *memory_map) {
         pmm.frame_search_limit = MAX_TRACKED_FRAMES;
     }
     pmm.initialized = pmm.free_frames != 0;
-    return pmm.initialized;
+    bool initialized = pmm.initialized;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return initialized;
 }
 
 static uint64_t find_free_frame(uint64_t start, uint64_t end) {
@@ -206,7 +213,9 @@ static uint64_t find_free_frame(uint64_t start, uint64_t end) {
 }
 
 uint64_t pmm_allocate_frame(void) {
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
     if (!pmm.initialized) {
+        spinlock_unlock_irqrestore(&pmm_lock, flags);
         return 0;
     }
 
@@ -215,6 +224,7 @@ uint64_t pmm_allocate_frame(void) {
         frame = find_free_frame(1, pmm.allocation_hint);
     }
     if (frame == 0) {
+        spinlock_unlock_irqrestore(&pmm_lock, flags);
         return 0;
     }
 
@@ -224,15 +234,20 @@ uint64_t pmm_allocate_frame(void) {
     if (pmm.allocation_hint >= pmm.frame_search_limit) {
         pmm.allocation_hint = 1;
     }
-    return frame * FRAME_SIZE;
+    uint64_t physical_address = frame * FRAME_SIZE;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return physical_address;
 }
 
 bool pmm_free_frame(uint64_t physical_address) {
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
     if (!pmm.initialized || physical_address == 0 || physical_address % FRAME_SIZE != 0) {
+        spinlock_unlock_irqrestore(&pmm_lock, flags);
         return false;
     }
     uint64_t frame = physical_address / FRAME_SIZE;
     if (!frame_is_tracked(frame) || !bitmap_test(pmm.usable_bitmap, frame) || bitmap_test(pmm.free_bitmap, frame)) {
+        spinlock_unlock_irqrestore(&pmm_lock, flags);
         return false;
     }
     bitmap_set(pmm.free_bitmap, frame);
@@ -240,39 +255,64 @@ bool pmm_free_frame(uint64_t physical_address) {
     if (frame < pmm.allocation_hint) {
         pmm.allocation_hint = frame;
     }
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
     return true;
 }
 
 uint64_t pmm_total_memory_bytes(void) {
-    return pmm.total_memory_bytes;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.total_memory_bytes;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_usable_memory_bytes(void) {
-    return pmm.usable_memory_bytes;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.usable_memory_bytes;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_tracked_memory_bytes(void) {
-    return pmm.tracked_usable_frames * FRAME_SIZE;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.tracked_usable_frames * FRAME_SIZE;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_kernel_memory_bytes(void) {
-    return pmm.kernel_memory_bytes;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.kernel_memory_bytes;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_framebuffer_memory_bytes(void) {
-    return pmm.framebuffer_memory_bytes;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.framebuffer_memory_bytes;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_bootloader_reclaimable_bytes(void) {
-    return pmm.bootloader_reclaimable_bytes;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.bootloader_reclaimable_bytes;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_free_frame_count(void) {
-    return pmm.free_frames;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.free_frames;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_allocated_frame_count(void) {
-    return pmm.tracked_usable_frames - pmm.free_frames;
+    uint64_t flags = spinlock_lock_irqsave(&pmm_lock);
+    uint64_t result = pmm.tracked_usable_frames - pmm.free_frames;
+    spinlock_unlock_irqrestore(&pmm_lock, flags);
+    return result;
 }
 
 uint64_t pmm_frame_size(void) {

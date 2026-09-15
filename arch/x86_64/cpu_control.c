@@ -41,6 +41,25 @@ void cpu_wait_for_interrupt(void) {
     __asm__ volatile ("hlt" : : : "memory");
 }
 
+void cpu_pause(void) {
+    __asm__ volatile ("pause" : : : "memory");
+}
+
+uint64_t cpu_interrupt_save_disable(void) {
+    uint64_t flags;
+    __asm__ volatile ("pushfq; popq %0; cli" : "=r"(flags) : : "memory");
+    return flags;
+}
+
+void cpu_interrupt_restore(uint64_t flags) {
+    if ((flags & (1ull << 9)) != 0) {
+        __asm__ volatile ("sti" : : : "memory");
+    }
+    else {
+        __asm__ volatile ("cli" : : : "memory");
+    }
+}
+
 uint64_t cpu_read_cr2(void) {
     uint64_t value;
     __asm__ volatile ("mov %%cr2, %0" : "=r"(value));

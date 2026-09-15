@@ -150,7 +150,7 @@ void task_yield(void) {
         return;
     }
     struct task *next = task_find_next_ready();
-    reschedule_requested = false;
+    __atomic_store_n(&reschedule_requested, false, __ATOMIC_RELAXED);
     if (next == 0) {
         return;
     }
@@ -180,11 +180,11 @@ KOS_NORETURN void task_exit(void) {
 }
 
 void task_timer_tick(void) {
-    reschedule_requested = true;
+    __atomic_store_n(&reschedule_requested, true, __ATOMIC_RELAXED);
 }
 
 void task_reschedule_if_needed(void) {
-    if (reschedule_requested) {
+    if (__atomic_exchange_n(&reschedule_requested, false, __ATOMIC_RELAXED)) {
         task_yield();
     }
 }

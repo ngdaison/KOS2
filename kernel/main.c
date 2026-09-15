@@ -6,15 +6,18 @@
 #include <kos/compiler.h>
 #include <kos/cpu.h>
 #include <kos/driver.h>
+#include <kos/e1000.h>
 #include <kos/framebuffer.h>
 #include <kos/heap.h>
 #include <kos/initramfs.h>
 #include <kos/interrupts.h>
 #include <kos/keyboard.h>
 #include <kos/log.h>
+#include <kos/net.h>
 #include <kos/pmm.h>
 #include <kos/pic.h>
 #include <kos/pci.h>
+#include <kos/ramfs.h>
 #include <kos/serial.h>
 #include <kos/timer.h>
 #include <kos/terminal.h>
@@ -58,6 +61,7 @@ static struct driver builtin_drivers[] = {
     { .name = "pit", .init = timer_driver_ready, .irq_handler = timer_irq_handler },
     { .name = "ps2-keyboard", .init = keyboard_driver_ready, .irq_handler = keyboard_irq_handler },
     { .name = "pci", .init = pci_driver_initialize },
+    { .name = "e1000", .init = e1000_initialize },
 };
 
 static bool strings_equal(const char *left, const char *right) {
@@ -186,6 +190,20 @@ static bool pmm_self_test(void) {
     return pmm_free_frame_count() == free_frames_before;
 }
 
+static bool vfs_volume_self_test(void) {
+    const uint8_t *system_data;
+    const uint8_t *data_volume_data;
+    uint64_t system_size;
+    uint64_t data_volume_size;
+    return vfs_volume_count() == 2
+        && vfs_read_file("C:\\README.TXT", &system_data, &system_size)
+        && system_size != 0
+        && system_data[0] != '\0'
+        && vfs_read_file("D:\\README.TXT", &data_volume_data, &data_volume_size)
+        && data_volume_size != 0
+        && data_volume_data[0] == 'K';
+}
+
 KOS_NORETURN void kernel_main(void) {
     serial_initialize();
     serial_write("KOS: kernel started\n");
@@ -312,19 +330,78 @@ KOS_NORETURN void kernel_main(void) {
     }
     log_info_u64("Driver framework initialized; registered drivers: ", driver_count());
     log_info_u64("PCI devices discovered: ", pci_device_count());
+    log_info(e1000_is_initialized()
+        ? "Intel e1000 built-in driver: RX/TX DMA rings initialized."
+        : "Intel e1000 built-in driver: no compatible PCI adapter.");
     const struct limine_file *initramfs_module = find_initramfs_module();
     if (initramfs_module == 0 || !initramfs_initialize(initramfs_module->address,
             initramfs_module->size)
-        || !vfs_mount_root(&initramfs_vfs_backend)) {
+        || !vfs_mount_root(&initramfs_vfs_backend)
+        || !ramfs_initialize()
+        || !vfs_mount_volume('D', "Data RAM", &ramfs_vfs_backend)) {
         log_error("Initramfs/VFS initialization failed.");
         kernel_halt();
     }
-    log_info_u64("Initramfs files mounted through VFS: ", vfs_file_count());
+    log_info_u64("VFS mounted volumes: ", vfs_volume_count());
+    log_info_u64("C: initramfs files: ", vfs_file_count_on_volume('C'));
+    log_info_u64("D: RAM volume files: ", vfs_file_count_on_volume('D'));
+    if (!vfs_volume_self_test()) {
+        log_error("VFS multi-volume self-test failed.");
+        kernel_halt();
+    }
+    log_info("VFS multi-volume path self-test passed.");
+    if (!net_initialize() || !net_udp_loopback_self_test()) {
+        log_error("Network loopback socket self-test failed.");
+        kernel_halt();
+    }
+    log_info("UDP loopback socket self-test passed.");
+    if (!net_icmp_self_test()) {
+        log_error("ICMP checksum self-test failed.");
+        kernel_halt();
+    }
+    log_info("ICMP checksum self-test passed.");
+    if (net_has_external_interface()) {
+        uint8_t gateway_mac[NET_ETHERNET_ADDRESS_SIZE];
+        if (net_arp_resolve(NET_QEMU_GATEWAY_ADDRESS, gateway_mac, NET_ARP_DEFAULT_TIMEOUT_TICKS)) {
+            log_info("ARP self-test passed: QEMU gateway resolved.");
+            uint64_t round_trip_ticks;
+            if (net_icmp_ping(NET_QEMU_GATEWAY_ADDRESS, 1, timer_frequency_hz(), &round_trip_ticks)) {
+                log_info("ICMP ping self-test passed: QEMU gateway replied.");
+            }
+            else {
+                log_error("ICMP ping self-test timed out: use ping 10.0.2.2 for diagnosis.");
+            }
+        }
+        else {
+            log_error("ARP self-test timed out: link remains available for manual diagnosis.");
+        }
+        if (net_dhcp_acquire(timer_frequency_hz() * 5)) {
+            log_info("DHCP self-test passed: QEMU DHCP lease acquired.");
+        }
+        else {
+            log_error("DHCP self-test timed out: use dhcp for diagnosis.");
+        }
+    }
     if (!task_initialize()) {
         log_error("Kernel task scheduler initialization failed.");
         kernel_halt();
     }
     log_info("Kernel task scheduler initialized in cooperative mode.");
+    log_info("Running bootstrap commands.");
+    if (!kernel_command_execute("sysinfo") || !kernel_command_execute("dhcp")
+        || !kernel_command_execute("netinfo")) {
+        log_error("Bootstrap command execution failure.");
+        kernel_halt();
+    }
+    (void)kernel_command_execute("tcptest 1.1.1.1 80");
+    (void)kernel_command_execute("nslookup example.com");
+    (void)kernel_command_execute("curl http://example.com/");
+    (void)kernel_command_execute("httpd start 80");
+    (void)kernel_command_execute("netstat");
+    (void)kernel_command_execute("curl -i http://10.0.2.15/");
+    (void)kernel_command_execute("curl http://10.0.2.15/sysinfo");
+    (void)kernel_command_execute("netstat");
+    (void)kernel_command_execute("netinfo");
     if (!terminal_initialize()) {
         log_error("Kernel terminal initialization failed.");
         kernel_halt();

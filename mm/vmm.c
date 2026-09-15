@@ -4,6 +4,7 @@
 #include <kos/cpu.h>
 #include <kos/memory.h>
 #include <kos/pmm.h>
+#include <kos/sync.h>
 #include <kos/vmm.h>
 
 enum {
@@ -24,6 +25,7 @@ struct virtual_memory_manager {
 };
 
 static struct virtual_memory_manager vmm;
+static struct kos_spinlock vmm_lock = KOS_SPINLOCK_INITIALIZER;
 
 static uint64_t *physical_to_virtual(uint64_t physical_address) {
     return (uint64_t *)(vmm.hhdm_offset + physical_address);
@@ -102,15 +104,22 @@ bool vmm_initialize(uint64_t hhdm_offset) {
     if (hhdm_offset == 0 || hhdm_offset % PAGE_SIZE != 0 || cr3 == 0) {
         return false;
     }
+    uint64_t flags = spinlock_lock_irqsave(&vmm_lock);
     vmm.hhdm_offset = hhdm_offset;
     vmm.pml4 = physical_to_virtual(cr3);
     vmm.initialized = true;
+    spinlock_unlock_irqrestore(&vmm_lock, flags);
     return true;
 }
 
 bool vmm_map_page(uint64_t virtual_address, uint64_t physical_address, uint64_t flags) {
-    if (!vmm.initialized || virtual_address % PAGE_SIZE != 0 || physical_address % PAGE_SIZE != 0
+    if (virtual_address % PAGE_SIZE != 0 || physical_address % PAGE_SIZE != 0
         || (flags & ~(VMM_PAGE_WRITABLE | VMM_PAGE_NO_EXECUTE)) != 0) {
+        return false;
+    }
+    uint64_t interrupt_flags = spinlock_lock_irqsave(&vmm_lock);
+    if (!vmm.initialized) {
+        spinlock_unlock_irqrestore(&vmm_lock, interrupt_flags);
         return false;
     }
 
@@ -118,6 +127,7 @@ bool vmm_map_page(uint64_t virtual_address, uint64_t physical_address, uint64_t 
     bool pml4_table_created;
     uint64_t *pdpt = next_table(pml4_entry, &pml4_table_created);
     if (pdpt == 0) {
+        spinlock_unlock_irqrestore(&vmm_lock, interrupt_flags);
         return false;
     }
     uint64_t *pdpt_entry = &pdpt[page_table_index(virtual_address, 30)];
@@ -139,6 +149,7 @@ bool vmm_map_page(uint64_t virtual_address, uint64_t physical_address, uint64_t 
 
     *entry = (physical_address & PAGE_ADDRESS_MASK) | PAGE_PRESENT | PAGE_KOS_OWNED_MAPPING | flags;
     cpu_invalidate_page(virtual_address);
+    spinlock_unlock_irqrestore(&vmm_lock, interrupt_flags);
     return true;
 
 rollback_directory:
@@ -153,10 +164,11 @@ rollback_pml4:
     if (pml4_table_created) {
         release_owned_empty_table(pml4_entry);
     }
+    spinlock_unlock_irqrestore(&vmm_lock, interrupt_flags);
     return false;
 }
 
-bool vmm_query_page(uint64_t virtual_address, uint64_t *physical_address, uint64_t *flags) {
+static bool vmm_query_page_unlocked(uint64_t virtual_address, uint64_t *physical_address, uint64_t *flags) {
     if (!vmm.initialized) {
         return false;
     }
@@ -210,6 +222,13 @@ bool vmm_query_page(uint64_t virtual_address, uint64_t *physical_address, uint64
     return true;
 }
 
+bool vmm_query_page(uint64_t virtual_address, uint64_t *physical_address, uint64_t *flags) {
+    uint64_t interrupt_flags = spinlock_lock_irqsave(&vmm_lock);
+    bool result = vmm_query_page_unlocked(virtual_address, physical_address, flags);
+    spinlock_unlock_irqrestore(&vmm_lock, interrupt_flags);
+    return result;
+}
+
 bool vmm_is_mapped(uint64_t virtual_address) {
     return vmm_query_page(virtual_address, 0, 0);
 }
@@ -220,7 +239,7 @@ static bool set_leaf_permissions(uint64_t virtual_address, uint64_t *entry, uint
     return true;
 }
 
-bool vmm_set_page_permissions(uint64_t virtual_address, uint64_t permissions) {
+static bool vmm_set_page_permissions_unlocked(uint64_t virtual_address, uint64_t permissions) {
     if (!vmm.initialized || (permissions & ~(VMM_PAGE_WRITABLE | VMM_PAGE_NO_EXECUTE)) != 0) {
         return false;
     }
@@ -256,7 +275,14 @@ bool vmm_set_page_permissions(uint64_t virtual_address, uint64_t permissions) {
     return set_leaf_permissions(virtual_address, page_entry, permissions);
 }
 
-uint64_t vmm_unmap_page(uint64_t virtual_address) {
+bool vmm_set_page_permissions(uint64_t virtual_address, uint64_t permissions) {
+    uint64_t interrupt_flags = spinlock_lock_irqsave(&vmm_lock);
+    bool result = vmm_set_page_permissions_unlocked(virtual_address, permissions);
+    spinlock_unlock_irqrestore(&vmm_lock, interrupt_flags);
+    return result;
+}
+
+static uint64_t vmm_unmap_page_unlocked(uint64_t virtual_address) {
     if (!vmm.initialized || virtual_address % PAGE_SIZE != 0) {
         return 0;
     }
@@ -295,5 +321,12 @@ uint64_t vmm_unmap_page(uint64_t virtual_address) {
             release_owned_empty_table(pml4_entry);
         }
     }
+    return physical_address;
+}
+
+uint64_t vmm_unmap_page(uint64_t virtual_address) {
+    uint64_t interrupt_flags = spinlock_lock_irqsave(&vmm_lock);
+    uint64_t physical_address = vmm_unmap_page_unlocked(virtual_address);
+    spinlock_unlock_irqrestore(&vmm_lock, interrupt_flags);
     return physical_address;
 }

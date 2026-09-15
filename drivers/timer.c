@@ -30,7 +30,7 @@ bool timer_initialize(uint32_t frequency_hz) {
     io_out8(PIT_COMMAND, PIT_COMMAND_CHANNEL_0_LOHI_MODE_3);
     io_out8(PIT_CHANNEL_0_DATA, (uint8_t)divisor);
     io_out8(PIT_CHANNEL_0_DATA, (uint8_t)(divisor >> 8));
-    ticks = 0;
+    __atomic_store_n(&ticks, 0, __ATOMIC_RELAXED);
     frequency = frequency_hz;
     initialized = true;
     return true;
@@ -42,12 +42,12 @@ bool timer_is_initialized(void) {
 
 void timer_interrupt(void) {
     if (initialized) {
-        ++ticks;
+        (void)__atomic_add_fetch(&ticks, 1, __ATOMIC_RELAXED);
     }
 }
 
 uint64_t timer_ticks(void) {
-    return ticks;
+    return __atomic_load_n(&ticks, __ATOMIC_RELAXED);
 }
 
 uint64_t timer_uptime_seconds(void) {

@@ -22,7 +22,7 @@ boot -> text output -> keyboard input -> command console -> basic RAM management
 ```
 
 The initial kernel-console commands are `help`, `clear`, `meminfo`, `uptime`,
-`echo`, and `reboot`.
+`sysinfo`, `netinfo`, `udptest`, `echo`, and `reboot`.
 
 ## Target
 
@@ -91,6 +91,9 @@ tools\kos-tool.exe run --display
 
 - [Scope and roadmap](docs/roadmap.md)
 - [Product vision](docs/product-vision.md)
+- [Desktop-OS capability audit and implementation order](docs/desktop-os-gap-analysis.md)
+- [VFS volumes and drive-letter paths](docs/vfs-volumes.md)
+- [Networking status and path to curl](docs/networking-roadmap.md)
 - [Architecture](docs/architecture.md)
 - [Boot process](docs/boot-process.md)
 - [Environment setup](docs/environment.md)
